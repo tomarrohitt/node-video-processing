@@ -11,7 +11,8 @@ const allowedMimeTypes = [
 ];
 const storage = multer.diskStorage({
   destination(req, _file, cb) {
-    const videoDir = (req as any).videoDir;
+    const videoDir = `./uploads/${req.videoId}`;
+
     if (!fs.existsSync(videoDir)) {
       fs.mkdirSync(videoDir, { recursive: true });
     }

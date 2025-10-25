@@ -1,16 +1,9 @@
 import path from "node:path";
 import { spawn } from "node:child_process";
+import { VideoMetaData } from "../types/ffmpeg";
 
-function makeThumbnail(
-  fullPath: string,
-  thumbnailPath: string,
-  dimensions: string,
-) {
+function makeThumbnail(fullPath: string, thumbnailPath: string, width: number) {
   return new Promise((resolve, reject) => {
-    const [width, _height] = (dimensions as string)
-      .trim()
-      .split("x")
-      .map(Number);
     const ffmpeg = spawn("ffmpeg", [
       "-i",
       fullPath,
@@ -23,7 +16,7 @@ function makeThumbnail(
 
     ffmpeg.on("close", (code) => {
       if (code === 0) {
-        resolve(true);
+        resolve(thumbnailPath);
       } else {
         reject(new Error(`Thumbnail creation failed: ${code}`));
       }
@@ -31,44 +24,80 @@ function makeThumbnail(
   });
 }
 
-function compressVideo(fullPath: string) {
+function compressVideo(
+  fullPath: string,
+  duration: number,
+  videoStatus: Map<
+    string,
+    { status: string; progress: number; error?: string; outputPath?: string }
+  >
+) {
   return new Promise((resolve, reject) => {
     const parsedPath = path.parse(fullPath);
 
     const outputPath = path.join(
       parsedPath.dir,
-      `${parsedPath.name}-compressed${parsedPath.ext}`,
+      `${parsedPath.name}-compressed${parsedPath.ext}`.replace(
+        parsedPath.ext,
+        "-hevc.mp4"
+      )
     );
+
+    console.log("Starting compression for:", fullPath);
 
     const ffmpeg = spawn("ffmpeg", [
       "-i",
       fullPath,
       "-c:v",
-      "libx264",
+      "libx265",
       "-crf",
       "28",
       "-preset",
-      "slow",
-      "-profile:v",
-      "high",
+      "fast",
       "-c:a",
       "aac",
       "-b:a",
-      "192k",
+      "128k",
+      "-movflags",
+      "+faststart",
       "-y",
       outputPath,
     ]);
+
+    ffmpeg.stderr.on("data", (data) => {
+      const output = data.toString();
+
+      const timeMatch = output.match(/time=(\d{2}):(\d{2}):(\d{2})\.(\d{2})/);
+      if (timeMatch && duration > 0) {
+        const [, hours, minutes, seconds, milliseconds] = timeMatch;
+        const currentTime =
+          +hours * 3600 + +minutes * 60 + +seconds + +milliseconds / 100;
+
+        const progress = Math.min((currentTime / duration) * 100, 100);
+
+        console.log(`📊 Compression progress: `);
+        videoStatus.set(fullPath.split("/")[1], {
+          status: "uploading",
+          progress: `${progress.toFixed(1)}%` as unknown as number,
+        });
+      }
+    });
+
+    ffmpeg.on("error", (error) => {
+      reject(new Error(`FFmpeg process error: ${error.message}`));
+    });
+
     ffmpeg.on("close", (code) => {
       if (code === 0) {
-        resolve(true);
+        resolve(outputPath);
       } else {
-        reject("Error");
+        reject(new Error(`Video compression failed: ${code}`));
       }
     });
   });
 }
 
-function getDimensions(fullPath: string) {
+function getMetadata(fullPath: string): Promise<VideoMetaData> {
   return new Promise((resolve, reject) => {
     const ffprobe = spawn("ffprobe", [
       "-v",
@@ -76,20 +105,21 @@ function getDimensions(fullPath: string) {
       "-select_streams",
       "v:0",
       "-show_entries",
-      "stream=width,height",
+      "stream=width,height,bitrate,duration,codec",
       "-of",
       "csv=s=x:p=0",
       fullPath,
     ]);
 
-    let dimensions = "";
+    let metadataStr = "";
     ffprobe.stdout.on("data", (data) => {
-      dimensions += data.toString();
+      metadataStr += data.toString();
     });
 
     ffprobe.on("close", (code) => {
       if (code === 0) {
-        resolve(dimensions);
+        const metadata = metadataStr.trim().split("x");
+        resolve(metadata);
       } else {
         reject(new Error(`FFprobe existed with this code: ${code}`));
       }
@@ -101,20 +131,29 @@ function getDimensions(fullPath: string) {
   });
 }
 
-async function processVideoAsync(videoDir: string, file: Express.Multer.File) {
+async function processVideoAsync(
+  videoDir: string,
+  file: Express.Multer.File,
+  VideoStatus: Map<
+    string,
+    { status: string; progress: number; error?: string; outputPath?: string }
+  >
+) {
   try {
     const fullPath = file.path;
-    const dimensions = (await getDimensions(fullPath)) as string;
+    const metadata = await getMetadata(fullPath);
 
     const thumbnailPath = path.join(
       videoDir,
-      `${file.originalname.split(".").slice(0, -1).join(".")}.png`,
+      `${file.originalname.split(".").slice(0, -1).join(".")}.png`
     );
 
-    await makeThumbnail(fullPath, thumbnailPath, dimensions);
-    await compressVideo(fullPath);
+    const [width, height, duration] = metadata.map(Number);
 
-    console.log("Processing:", file.filename);
+    await makeThumbnail(fullPath, thumbnailPath, width);
+    await compressVideo(fullPath, duration, VideoStatus);
+
+    console.log("Processed:", file.filename);
   } catch (e) {
     console.error("Async processing failed", e);
   }
