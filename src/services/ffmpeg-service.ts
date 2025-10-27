@@ -1,5 +1,4 @@
 import { spawn } from "node:child_process";
-import { VideoStatusStore, videoStatusStore } from "../store/status";
 import path from "node:path";
 import { VideoMetadata } from "../types";
 import { config } from "../config";
@@ -31,63 +30,28 @@ export class FFmpegService {
     });
   }
 
-  static async getResolutions(
+  static async getResolution(
     fullPath: string,
     parsedPath: path.ParsedPath,
-    resolution: {
-      width: number;
-      height: number;
-      name: string;
-      bitrate: string;
-    },
-    duration: number,
-    videoStatusStore: VideoStatusStore
+    resolution: number
   ) {
     return new Promise((resolve, reject) => {
       const outputPath = path.join(
         parsedPath.dir,
-        `${parsedPath.name}-${resolution.height}${parsedPath.ext}`
+        `${parsedPath.name}-${resolution}${parsedPath.ext}`
       );
       const ffmpeg = spawn("ffmpeg", [
         "-i",
         fullPath,
-        "-vf",
-        `scale=${resolution.width}:${resolution.height}`,
         "-c:v",
-        "libx265",
-        "-crf",
-        "28",
-        "-preset",
-        "fast",
-        "-b:v",
-        resolution.bitrate,
+        "copy",
         "-c:a",
-        "aac",
-        "-b:a",
-        "128k",
+        "copy",
         "-movflags",
         "+faststart",
         "-y",
         outputPath,
       ]);
-
-      ffmpeg.stderr.on("data", (data) => {
-        const output = data.toString();
-
-        const timeMatch = output.match(/time=(\d{2}):(\d{2}):(\d{2})\.(\d{2})/);
-        if (timeMatch && duration > 0) {
-          const [, hours, minutes, seconds, milliseconds] = timeMatch;
-          const currentTime =
-            +hours * 3600 + +minutes * 60 + +seconds + +milliseconds / 100;
-
-          const progress = Math.min((currentTime / duration) * 100, 100);
-
-          videoStatusStore.set(fullPath.split("/")[1], {
-            status: "compressing",
-            progress: `${progress.toFixed(1)}%`,
-          });
-        }
-      });
 
       ffmpeg.on("error", (error) => {
         reject(new Error(`FFmpeg process error: ${error.message}`));
@@ -103,35 +67,10 @@ export class FFmpegService {
     });
   }
 
-  static async compressVideo(
-    fullPath: string,
-    duration: number,
-    height: number,
-    videoStatusStore: VideoStatusStore
-  ) {
+  static async compressVideo(fullPath: string, height: number) {
     const parsedPath = path.parse(fullPath);
 
-    const targetResolutions = config.resolutions.filter(
-      (resolution) => resolution.height <= height
-    );
-
-    if (targetResolutions.length === 0) {
-      throw new Error("Source video resolution is too low for compression");
-    }
-
-    const outputPromises = targetResolutions.map((resolution) =>
-      this.getResolutions(
-        fullPath,
-        parsedPath,
-        resolution,
-        duration,
-        videoStatusStore
-      )
-    );
-
-    const outputs = await Promise.all(outputPromises);
-
-    return outputs.filter((output) => output !== null) as string[];
+    return this.getResolution(fullPath, parsedPath, height);
   }
 
   static async getMetadata(fullPath: string): Promise<VideoMetadata> {
@@ -142,7 +81,7 @@ export class FFmpegService {
         "-select_streams",
         "v:0",
         "-show_entries",
-        "stream=width,height,bitrate,duration,codec",
+        "stream=width,height",
         "-of",
         "csv=s=x:p=0",
         fullPath,
