@@ -7,7 +7,7 @@ This is a Node.js application for processing videos. It uses Express.js for the 
 1.  **Upload:** The user uploads a video file through the `/api/upload` endpoint.
 2.  **Queue:** The video is added to a `video-queue` using `bullmq`.
 3.  **Process:** A background worker picks up the job from the queue and processes the video using `ffmpeg`. The processing can include creating thumbnails, compressing the video, and changing the resolution.
-4.  **Status:** The user can check the status of the video processing by using the `/api/status/:videoId` endpoint.
+4.  **Status:** The user can check the status of the video processing by using the `/api/status` endpoint.
 
 ## Features
 
