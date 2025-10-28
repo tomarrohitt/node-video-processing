@@ -31,7 +31,7 @@ These instructions will get you a copy of the project up and running on your loc
 
 1.  Clone the repo
     ```sh
-    git clone https://github.com/your_username_/video-processing-app.git
+    git clone https://github.com/tomarrohitt/video-processing-app.git
     ```
 2.  Install NPM packages
     ```sh
