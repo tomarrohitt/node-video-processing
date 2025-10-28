@@ -63,11 +63,7 @@ These instructions will get you a copy of the project up and running on your loc
 
 ```
 /video-processing-app/
-├───.gitignore
-├───index.ts
-├───package.json
-├───README.md
-├───tsconfig.json
+
 ├───.git/...
 ├───node_modules/...
 └───src/
@@ -91,6 +87,11 @@ These instructions will get you a copy of the project up and running on your loc
     │   └───index.ts
     └───workers/
         └───video-worker.ts
+├───.gitignore
+├───index.ts
+├───package.json
+├───README.md
+├───tsconfig.json
 ```
 
 - **`config`**: Configuration files.
