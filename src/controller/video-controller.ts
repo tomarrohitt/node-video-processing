@@ -25,17 +25,20 @@ export async function handleUpload(req: Request, res: Response) {
       file: req.file,
     });
 
-    res.status(202).json({ message: "Video uploaded", file: req.file });
+    const { originalname, mimetype, size } = req.file;
+    res.status(202).json({
+      status: "processing",
+      videoId: req.videoId,
+      message:
+        "Video uploaded and is now being processed. This may take a few minutes.",
+      file: {
+        originalName: originalname,
+        mimeType: mimetype,
+        size,
+      },
+    });
   } catch (error) {
     console.error("upload error", error);
     return res.status(500).json({ message: "Internal server error" });
   }
-}
-
-export function getStatus(req: Request, res: Response): void {
-  const videoId = req.params.videoId;
-
-  res.json({
-    videoId,
-  });
 }

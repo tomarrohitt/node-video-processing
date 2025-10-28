@@ -115,11 +115,9 @@ Uploads a video for processing.
   - `400 Bad Request`: If no file is uploaded or if the file is invalid.
   - `500 Internal Server Error`: If there is a server error.
 
-### `GET /api/status/:videoId`
+### `GET /api/stats`
 
-Gets the status of a video processing job.
+Gets the status of a video processing jobs in queue.
 
-- **Parameters:**
-  - `videoId` (string): The ID of the video.
 - **Response:**
   - `200 OK`: Returns the status of the video.

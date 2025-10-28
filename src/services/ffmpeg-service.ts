@@ -1,7 +1,6 @@
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { VideoMetadata } from "../types";
-import { config } from "../config";
 
 export class FFmpegService {
   static async makeThumbnail(
@@ -44,11 +43,19 @@ export class FFmpegService {
         "-i",
         fullPath,
         "-c:v",
-        "copy",
+        "libx265",
+        "-crf",
+        "28",
+        "-preset",
+        "fast",
         "-c:a",
-        "copy",
+        "aac",
+        "-b:a",
+        "128k",
         "-movflags",
         "+faststart",
+        "-tag:v",
+        "hvc1",
         "-y",
         outputPath,
       ]);
