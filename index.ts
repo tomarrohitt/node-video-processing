@@ -11,7 +11,7 @@ const app = express();
 const httpServer = createServer(app);
 
 app.use(express.json());
-app.use(cors({ origin: "*" }));
+app.use(cors({ origin: config.clientUrl }));
 
 app.use("/api", router);
 

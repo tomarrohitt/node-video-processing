@@ -149,7 +149,7 @@ Downloads a compressed video.
 - **Response:**
   - `200 OK`: Returns the compressed video file.
 
-### `GET /api/videos/:videoId/thumbnail`
+### `GET /api/thumbnail/:videoId/`
 
 Downloads a video thumbnail.
 

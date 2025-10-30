@@ -11,4 +11,5 @@ export const config = {
   ],
   redisHost: process.env.REDIS_HOST || "localhost",
   redisPort: Number(process.env.REDIS_PORT) || 6379,
+  clientUrl: process.env.CLIENT_URL || "localhost:5173",
 };
