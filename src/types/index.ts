@@ -5,4 +5,17 @@ export type VideoStatus =
   | "failed"
   | "compressing";
 
-export type VideoMetadata = string[];
+export type VideoMetadata = {
+  id: string;
+  fileName: string;
+  duration: number;
+  width: number;
+  height: number;
+  codec: string;
+  bitrate: number;
+  originalSize: number;
+  outputPath?: string;
+  thumbnailPath?: string;
+  format: string;
+  uploadedAt: number;
+};

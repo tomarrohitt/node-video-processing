@@ -1,6 +1,8 @@
+import fs from "fs";
 import { spawn } from "node:child_process";
-import path from "node:path";
+
 import { VideoMetadata } from "../types";
+import { getOutputPath } from "../utils/get-output-path";
 
 export class FFmpegService {
   static async makeThumbnail(
@@ -29,29 +31,24 @@ export class FFmpegService {
     });
   }
 
-  static async getResolution(
+  static async compressVideo(
     fullPath: string,
-    parsedPath: path.ParsedPath,
-    resolution: number
-  ) {
+    duration: number,
+    onProgress: (progress: number) => void
+  ): Promise<string> {
     return new Promise((resolve, reject) => {
-      const outputPath = path.join(
-        parsedPath.dir,
-        `${parsedPath.name}-${resolution}${parsedPath.ext}`
-      );
+      const outputPath = getOutputPath(fullPath);
       const ffmpeg = spawn("ffmpeg", [
         "-i",
         fullPath,
         "-c:v",
         "libx265",
-        "-crf",
-        "28",
         "-preset",
-        "fast",
+        "slow",
+        "-crf",
+        "20",
         "-c:a",
-        "aac",
-        "-b:a",
-        "128k",
+        "copy",
         "-movflags",
         "+faststart",
         "-tag:v",
@@ -60,11 +57,28 @@ export class FFmpegService {
         outputPath,
       ]);
 
+      let lastUpdate = 0;
+      ffmpeg.stderr.on("data", (data) => {
+        const now = Date.now();
+        if (now - lastUpdate < 700) return; // only update every 300ms
+        lastUpdate = now;
+        const str = data.toString();
+        const timeMatch = str.match(/time=(\d+:\d+:\d+\.\d+)/);
+        if (timeMatch) {
+          const [h, m, s] = timeMatch[1].split(":").map(parseFloat);
+          const current = h * 3600 + m * 60 + s;
+          const progress = Math.min((current / duration) * 100, 100);
+          onProgress(progress);
+        }
+      });
+
       ffmpeg.on("error", (error) => {
+        fs.existsSync(outputPath) && fs.unlinkSync(outputPath);
         reject(new Error(`FFmpeg process error: ${error.message}`));
       });
 
       ffmpeg.on("close", (code) => {
+        ffmpeg.stderr.removeAllListeners();
         if (code === 0) {
           resolve(outputPath);
         } else {
@@ -74,37 +88,55 @@ export class FFmpegService {
     });
   }
 
-  static async compressVideo(fullPath: string, height: number) {
-    const parsedPath = path.parse(fullPath);
-
-    return this.getResolution(fullPath, parsedPath, height);
-  }
-
   static async getMetadata(fullPath: string): Promise<VideoMetadata> {
     return new Promise((resolve, reject) => {
       const ffprobe = spawn("ffprobe", [
         "-v",
-        "error",
-        "-select_streams",
-        "v:0",
-        "-show_entries",
-        "stream=width,height",
-        "-of",
-        "csv=s=x:p=0",
+        "quiet",
+        "-print_format",
+        "json",
+        "-show_format",
+        "-show_streams",
         fullPath,
       ]);
 
-      let metadataStr = "";
-      ffprobe.stdout.on("data", (data) => {
-        metadataStr += data.toString();
-      });
+      let output = "";
+      ffprobe.stdout.on("data", (data) => (output += data.toString()));
 
       ffprobe.on("close", (code) => {
-        if (code === 0) {
-          const metadata = metadataStr.trim().split("x");
+        if (code !== 0) {
+          reject(new Error(`FFprobe failed with code: ${code}`));
+          return;
+        }
+        try {
+          const data = JSON.parse(output);
+
+          // id: number;
+          // fileName: string;
+          // duration: number;
+          // width: number;
+          // height: number;
+          // codec: string;
+          // bitrate: number;
+          // originalSize: number;
+          // outputPath: string;
+          // format: string;
+          // uploadedAt: Date;
+          const metadata = {
+            id: data.format.filename.split("/")[1] as string,
+            fileName: data.format.filename.split("/")[-1] as string,
+            duration: parseFloat(data.format.duration),
+            width: data.streams[0]?.width as number,
+            height: data.streams[0]?.height as number,
+            codec: data.streams[0]?.codec_name as string,
+            bitrate: parseInt(data.format.bit_rate),
+            originalSize: parseInt(data.format.size) as number,
+            format: data.format.format_long_name as string,
+            uploadedAt: Date.now(),
+          };
           resolve(metadata);
-        } else {
-          reject(new Error(`FFprobe existed with this code: ${code}`));
+        } catch (error) {
+          reject(new Error(`Failed to parse FFprobe output: ${error}`));
         }
       });
 

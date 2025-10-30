@@ -8,6 +8,7 @@ This is a Node.js application for processing videos. It uses Express.js for the 
 2.  **Queue:** The video is added to a `video-queue` using `bullmq`.
 3.  **Process:** A background worker picks up the job from the queue and processes the video using `ffmpeg`. The processing can include creating thumbnails, compressing the video, and changing the resolution.
 4.  **Status:** The user can check the status of the video processing by using the `/api/status` endpoint.
+5.  **Cleanup:** A cleanup worker runs every 12 hours to remove uploaded videos and clear the Redis cache.
 
 ## Features
 
@@ -15,6 +16,9 @@ This is a Node.js application for processing videos. It uses Express.js for the 
 - Queue-based video processing with `bullmq`.
 - Video processing with `ffmpeg` (thumbnail generation, compression, resolution change).
 - Background worker to process videos without blocking the main thread.
+- Cleanup worker to remove old videos and clear Redis cache.
+- Downloadable thumbnails and compressed videos.
+- Get the last 3 compressed videos.
 
 ## Getting Started
 
@@ -64,16 +68,16 @@ These instructions will get you a copy of the project up and running on your loc
 ```
 /video-processing-app/
 
-├───.git/...
-├───node_modules/...
+├───.git/…
+├───node_modules/…
 └───src/
     ├───config/
     │   └───index.ts
     ├───controller/
     │   └───video-controller.ts
     ├───middlewares/
-    │   ├───upload-middleware.ts
-    │   └───upload.ts
+    │   ├───stats-middleware.ts
+    │   └───upload-middleware.ts
     ├───queues/
     │   ├───queue-event.ts
     │   └───video-queue.ts
@@ -81,11 +85,18 @@ These instructions will get you a copy of the project up and running on your loc
     │   └───video-route.ts
     ├───services/
     │   ├───ffmpeg-service.ts
+    │   ├───redis-service.ts
+    │   ├───stream-service.ts
     │   └───video-service.ts
+    ├───socket/
+    │   └───socket-server.ts
     ├───types/
     │   ├───express.d.ts
     │   └───index.ts
+    ├───utils/
+    │   └───get-output-path.ts
     └───workers/
+        ├───cleanup-worker.ts
         └───video-worker.ts
 ├───.gitignore
 ├───index.ts
@@ -100,7 +111,9 @@ These instructions will get you a copy of the project up and running on your loc
 - **`queues`**: `bullmq` queue definitions.
 - **`routes`**: Express routes.
 - **`services`**: Business logic and services (e.g., `ffmpeg` wrapper).
+- **`socket`**: Socket server for real-time communication.
 - **`types`**: TypeScript type definitions.
+- **`utils`**: Utility functions.
 - **`workers`**: Background workers that process queue jobs.
 
 ## API Endpoints
@@ -121,3 +134,24 @@ Gets the status of a video processing jobs in queue.
 
 - **Response:**
   - `200 OK`: Returns the status of the video.
+
+### `GET /api/videos`
+
+Gets the last 3 compressed videos.
+
+- **Response:**
+  - `200 OK`: Returns an array of the last 3 compressed videos.
+
+### `GET /api/videos/:videoId`
+
+Downloads a compressed video.
+
+- **Response:**
+  - `200 OK`: Returns the compressed video file.
+
+### `GET /api/videos/:videoId/thumbnail`
+
+Downloads a video thumbnail.
+
+- **Response:**
+  - `200 OK`: Returns the thumbnail image file.

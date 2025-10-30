@@ -1,16 +1,11 @@
 import { Queue } from "bullmq";
-import IORedis from "ioredis";
+import { RedisService } from "../services/redis-service";
 
-const connection = new IORedis({
-  host: "localhost",
-  port: 6379,
-});
+const redisService = RedisService.getInstance();
+const connection = redisService.publisher;
 
 export const videoQueue = new Queue("video-queue", { connection });
 
 videoQueue.on("error", (error) => {
   console.error("Queue error", error);
-});
-videoQueue.on("waiting", (job) => {
-  console.log(`Job with jobId:${job?.id} is active`);
 });

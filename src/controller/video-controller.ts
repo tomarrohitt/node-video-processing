@@ -21,9 +21,19 @@ export async function handleUpload(req: Request, res: Response) {
       return res.status(400).json({ message: req.fileValidatorError });
     }
 
-    await videoQueue.add("process-video", {
-      file: req.file,
-    });
+    if (!req.videoId) {
+      return res.status(500).json({ message: "Internal server error" });
+    }
+
+    await videoQueue.add(
+      "process-video",
+      {
+        file: req.file,
+      },
+      {
+        jobId: req.videoId,
+      }
+    );
 
     const { originalname, mimetype, size } = req.file;
     res.status(202).json({
